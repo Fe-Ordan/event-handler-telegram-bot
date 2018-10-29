@@ -1,5 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api')
 const Datastore = require('nedb')
+const request = require('request')
 
 const db = new Datastore({ filename: 'store.db', autoload: true })
 
@@ -28,11 +29,37 @@ bot.on('message', (msg) => {
             }
         })
     } else if (msg.text.match(/\/finish/)) {
-        bot.sendMessage(msg.chat.id, `Finish`)
+        db.update({ _id: msg.chat.id }, {$set: {active: false}}, {returnUpdatedDocs: true}, (err, numAffected, affectedDoc) => {
+            bot.sendMessage(msg.chat.id, `${affectedDoc.title}`)
+            bot.sendMessage(msg.chat.id, `Date: ${affectedDoc.date}`)
+            bot.sendLocation(msg.chat.id, 44.1234, 61.2163)
+        })
     } else {
-        db.update({ _id: msg.chat.id }, {$set: {title: msg.text}}, {returnUpdatedDocs: true}, (err, numAffected, affectedDoc) => {
-            console.log("affectedDoc: ", affectedDoc)
-            console.log("err: ", err)
+        db.findOne({ _id: msg.chat.id }, (err, doc) => {
+            if (doc && doc.active) {
+                if (!doc.title) {
+                    bot.sendMessage(msg.chat.id, `Great, now send me the DATE for ${msg.text} meeting`)
+                    db.update({ _id: msg.chat.id }, {$set: {title: msg.text}}, {returnUpdatedDocs: true}, (err, numAffected, affectedDoc) => {
+                        console.log("affectedDoc: ", affectedDoc)
+                        console.log("err: ", err)
+                    })
+                } else if(!doc.date) {
+                    bot.sendMessage(msg.chat.id, `Great, now send me the location for ${msg.text} meeting`)
+                    db.update({ _id: msg.chat.id }, {$set: {date: msg.text}}, {returnUpdatedDocs: true}, (err, numAffected, affectedDoc) => {
+                        console.log("affectedDoc: ", affectedDoc)
+                        console.log("err: ", err)
+                    })
+                } else if(!doc.location) {
+                    bot.sendMessage(msg.chat.id, `Great, now publish it !`)
+                    db.update({ _id: msg.chat.id }, {$set: {location: msg.text}}, {returnUpdatedDocs: true}, (err, numAffected, affectedDoc) => {
+                        console.log("affectedDoc: ", affectedDoc)
+                        console.log("err: ", err)
+                    })
+                } else {
+                    bot.sendMessage(msg.chat.id, `Publish your meeting !`)                    
+                }
+            }
         })
     }
+
 })
