@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/fatihint/meeting-telegram-bot#readme",
   "dependencies": {
+    "nedb": "^1.8.0",
     "node-telegram-bot-api": "^0.30.0"
   }
 }
