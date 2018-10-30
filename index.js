@@ -16,70 +16,61 @@ bot.on('message', (msg) => {
     if (msg.text.match(/\/start/)) {
         bot.sendMessage(msg.chat.id, `Let's start, send me the meeting title !`)
 
-        db.findOne({ _id: msg.chat.id }, (err, doc) => {
-            if (doc) {
-                console.log('doc', doc)
-            } else {
-                doc = {
-                    _id: msg.chat.id,
-                    active: true
-                }
+        db.remove({ _chatId: msg.chat.id, active: true }, { multi: true }, (err, numRemoved) => {
+            doc = {
+                _chatId: msg.chat.id,
+                active: true,
+            }
 
-                db.insert(doc, (err, newDoc) => {
-                    console.log("newDoc: ", newDoc)
-                    console.log("err", err)
-                })
-            }
-        })
-    } else if (msg.text.match(/\/finish/)) {
-        db.update({ _id: msg.chat.id }, { $set: { active: false } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
-            try {
-                bot.sendMessage(msg.chat.id, `${affectedDoc.title}`)
-                bot.sendMessage(msg.chat.id, `Date: ${affectedDoc.date}`)
-                if (affectedDoc.location.lat) {
-                    bot.sendLocation(msg.chat.id, affectedDoc.location.lat, affectedDoc.location.lng)
-                }
-                bot.sendMessage(msg.chat.id, `Adress: ${affectedDoc.location.address}`)
-            } catch (err) {
-                console.log(err)
-            }
+            db.insert(doc, (err, newDoc) => {
+                console.log("newDoc: ", newDoc)
+                console.log("err", err)
+            })
         })
     } else {
-        db.findOne({ _id: msg.chat.id }, (err, doc) => {
+        db.findOne({ _chatId: msg.chat.id, active: true }, (err, doc) => {
             if (doc && doc.active) {
                 if (!doc.title) {
                     bot.sendMessage(msg.chat.id, `Great, now send me the DATE for ${msg.text} meeting`)
-                    db.update({ _id: msg.chat.id }, { $set: { title: msg.text } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
+                    db.update({ _chatId: msg.chat.id, active: true }, { $set: { title: msg.text } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
                         console.log("affectedDoc: ", affectedDoc)
                         console.log("err: ", err)
                     })
                 } else if (!doc.date) {
                     bot.sendMessage(msg.chat.id, `Great, now send me the location for ${msg.text} meeting`)
-                    db.update({ _id: msg.chat.id }, { $set: { date: msg.text } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
+                    db.update({ _chatId: msg.chat.id, active: true }, { $set: { date: msg.text } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
                         console.log("affectedDoc: ", affectedDoc)
                         console.log("err: ", err)
                     })
                 } else if (!doc.location) {
-                    bot.sendMessage(msg.chat.id, `Great, now publish it !`)
+                    bot.sendMessage(msg.chat.id, `Great, event ready !`)
                     geocodeRequest(msg.text, (err, location) => {
                         if (err) {
                             location = {
                                 address: msg.text
                             }
                         }
-                        db.update({ _id: msg.chat.id }, { $set: { location } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
-                            console.log("affectedDoc: ", affectedDoc)
-                            console.log("err: ", err)
+                        db.update({ _chatId: msg.chat.id, active: true }, { $set: { location } }, { returnUpdatedDocs: true }, (err) => {
+                            if (!err) generateEvent(msg.chat.id)
                         })
                     })
-                } else {
-                    bot.sendMessage(msg.chat.id, `Publish your meeting !`)
                 }
             }
         })
     }
-
 })
+
+function generateEvent(msgChatId) {
+
+    db.findOne({ _chatId: msgChatId, active: true }, (err, doc) => {
+        if (doc) {
+            bot.sendMessage(msgChatId, `*${doc.title}* \n\n \uD83D\uDCC5  ${doc.date} \n\n Adress: ${doc.location.address}`, { parse_mode: "Markdown" })
+            if (doc.location.lat) {
+                bot.sendLocation(msgChatId, doc.location.lat, doc.location.lng)
+            }
+        }
+    })
+}
 
 /**
  * @param {*} address 
