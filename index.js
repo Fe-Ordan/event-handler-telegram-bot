@@ -34,7 +34,10 @@ bot.on('message', (msg) => {
             event = {
                 _chatId: msg.chat.id,
                 active: true,
-                readyToPublished: false
+                readyToPublished: false,
+                positive: 0,
+                neutral: 0,
+                negative: 0
             }
             db.remove({ _chatId: msg.chat.id, active: true }, { multi: true }, () => {
                 db.insert(event, (err, newDoc) => {
@@ -50,6 +53,37 @@ bot.on('message', (msg) => {
                 bot.sendMessage(msg.chat.id, `Can't find any active events. Send /start to create a new one.`)
             }
         })
+    } else if(msg.text.match(/\I'm going/) || msg.text.match(/\No/) || msg.text.match(/\Maybe/)) {
+
+        switch(msg.text) {
+            case 'I\'m going':
+                update = positive
+                break
+            case 'No':
+                update = neutral
+                break
+            case 'Maybe':
+                update = negative
+                break
+        }
+
+        db.update({ _chatId: msg.chat.id }, { $inc: { update: 1 } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
+            if (affectedDoc) {
+                generateEvent(affectedDoc, msg)
+            }
+        })
+    // } else if(msg.text === 'Maybe') {
+    //     db.update({ _chatId: msg.chat.id }, { $inc: { neutral: 1 } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
+    //         if (affectedDoc) {
+    //             generateEvent(affectedDoc, msg)
+    //         }
+    //     })
+    // } else if(msg.text === 'No') {
+    //     db.update({ _chatId: msg.chat.id }, { $inc: { negative: 1 } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
+    //         if (affectedDoc) {
+    //             generateEvent(affectedDoc, msg)
+    //         }
+    //     })
     }
     else {
         db.findOne({ _chatId: msg.chat.id, active: true }, (err, doc) => {
@@ -88,15 +122,19 @@ bot.on('message', (msg) => {
  * 
  */
 function generateEvent(doc, msg) {
-    var message = ''
+    var message = '', reply_markup
 
     if (msg.chat.type === 'private') {
         message += 'Event created. Use this link to share it to a group:\n'
         message += `http://t.me/meetingsetterbot?startgroup=${doc._id}\n\n`
+    } else {
+        reply_markup = {
+            "keyboard": [['I\'m going !'], ['Maybe'], ['No']]
+        }
     }
 
-    message += `*${doc.title}* \n\n \uD83D\uDCC5  ${doc.date} \n\n Adress: ${doc.location.address}`
-    bot.sendMessage(msg.chat.id, message, { parse_mode: "Markdown" })
+    message += `*${doc.title}* \n\n \uD83D\uDCC5  ${doc.date} \n\n Adress: ${doc.location.address} \n\n Going: ${doc.positive} \n Maybe: ${doc.neutral} \n No: ${doc.negative}`
+    bot.sendMessage(msg.chat.id, message, { parse_mode: "Markdown", reply_markup })
     if (doc.location.lat) {
         bot.sendLocation(msg.chat.id, doc.location.lat, doc.location.lng)
     }
