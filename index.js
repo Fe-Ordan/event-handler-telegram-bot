@@ -13,6 +13,9 @@ const bot = new TelegramBot(TELEGRAM_BOT_API_TOKEN, { polling: true })
  *  Listener for the message event.
  */
 bot.on('message', (msg) => {
+
+    console.log(JSON.stringify(msg, 0, 2))
+
     if (msg.text.match(/\/start/)) {
         bot.sendMessage(msg.chat.id, `Let's start, send me the meeting title !`)
 
@@ -27,23 +30,26 @@ bot.on('message', (msg) => {
                 console.log("err", err)
             })
         })
-    } else {
+    } else if(msg.text.match(/\/events/)) {
+        db.findOne({_chatId: msg.chat.id, active: true}, (err, doc) => {
+            if (doc) {
+                generateEvent(msg.chat.id)
+            } else {
+                bot.sendMessage(`Can't find any active events. Send /start to create a new one.`)
+            }   
+        })
+    }
+    else {
         db.findOne({ _chatId: msg.chat.id, active: true }, (err, doc) => {
             if (doc && doc.active) {
                 if (!doc.title) {
-                    bot.sendMessage(msg.chat.id, `Great, now send me the DATE for ${msg.text} meeting`)
-                    db.update({ _chatId: msg.chat.id, active: true }, { $set: { title: msg.text } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
-                        console.log("affectedDoc: ", affectedDoc)
-                        console.log("err: ", err)
-                    })
+                    bot.sendMessage(msg.chat.id, `Great,now send me the *date* or *time* for ${msg.text} meeting.`, { parse_mode: "Markdown" })
+                    db.update({ _chatId: msg.chat.id, active: true }, { $set: { title: msg.text } }, { returnUpdatedDocs: true })
                 } else if (!doc.date) {
-                    bot.sendMessage(msg.chat.id, `Great, now send me the location for ${msg.text} meeting`)
-                    db.update({ _chatId: msg.chat.id, active: true }, { $set: { date: msg.text } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
-                        console.log("affectedDoc: ", affectedDoc)
-                        console.log("err: ", err)
-                    })
+                    bot.sendMessage(msg.chat.id, `Send me the *location* for the meeting.`, { parse_mode: "Markdown"})
+                    db.update({ _chatId: msg.chat.id, active: true }, { $set: { date: msg.text } }, { returnUpdatedDocs: true })
                 } else if (!doc.location) {
-                    bot.sendMessage(msg.chat.id, `Great, event ready !`)
+                    bot.sendMessage(msg.chat.id, `Event ready !`)
                     geocodeRequest(msg.text, (err, location) => {
                         if (err) {
                             location = {
@@ -60,6 +66,16 @@ bot.on('message', (msg) => {
     }
 })
 
+/**
+ * 
+ * @param {*} msgChatId 
+ * A unique chat identifier
+ * 
+ * Generates a message that contains information about meeting
+ * which is ready to be published.
+ * 
+ * @todo: Take the document itself as parameter, db query is redundant.
+ */
 function generateEvent(msgChatId) {
 
     db.findOne({ _chatId: msgChatId, active: true }, (err, doc) => {
