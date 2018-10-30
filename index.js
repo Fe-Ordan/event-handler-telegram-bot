@@ -23,6 +23,7 @@ bot.on('message', (msg) => {
             doc = {
                 _chatId: msg.chat.id,
                 active: true,
+                readyToPublished: false
             }
 
             db.insert(doc, (err, newDoc) => {
@@ -31,11 +32,11 @@ bot.on('message', (msg) => {
             })
         })
     } else if(msg.text.match(/\/events/)) {
-        db.findOne({_chatId: msg.chat.id, active: true}, (err, doc) => {
+        db.findOne({_chatId: msg.chat.id, active: true, readyToPublished: true}, (err, doc) => {
             if (doc) {
-                generateEvent(msg.chat.id)
+                generateEvent(doc, msg)
             } else {
-                bot.sendMessage(`Can't find any active events. Send /start to create a new one.`)
+                bot.sendMessage(msg.chat.id, `Can't find any active events. Send /start to create a new one.`)
             }   
         })
     }
@@ -56,8 +57,8 @@ bot.on('message', (msg) => {
                                 address: msg.text
                             }
                         }
-                        db.update({ _chatId: msg.chat.id, active: true }, { $set: { location } }, { returnUpdatedDocs: true }, (err) => {
-                            if (!err) generateEvent(msg.chat.id)
+                        db.update({ _chatId: msg.chat.id, active: true }, { $set: { location, readyToPublished: true } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
+                            if (!err) generateEvent(affectedDoc, msg)
                         })
                     })
                 }
@@ -74,18 +75,20 @@ bot.on('message', (msg) => {
  * Generates a message that contains information about meeting
  * which is ready to be published.
  * 
- * @todo: Take the document itself as parameter, db query is redundant.
  */
-function generateEvent(msgChatId) {
+function generateEvent(doc, msg) {
+    var message = ''
+    
+    if (msg.chat.type === 'private') {
+        message += 'Event created. Use this link to share it to a group:\n'
+        message += 'http://t.me/meetingsetterbot?startgroup=qweasd  \n\n'
+    }
 
-    db.findOne({ _chatId: msgChatId, active: true }, (err, doc) => {
-        if (doc) {
-            bot.sendMessage(msgChatId, `*${doc.title}* \n\n \uD83D\uDCC5  ${doc.date} \n\n Adress: ${doc.location.address}`, { parse_mode: "Markdown" })
-            if (doc.location.lat) {
-                bot.sendLocation(msgChatId, doc.location.lat, doc.location.lng)
-            }
-        }
-    })
+    message += `*${doc.title}* \n\n \uD83D\uDCC5  ${doc.date} \n\n Adress: ${doc.location.address}`
+    bot.sendMessage(msg.chat.id, message, { parse_mode: "Markdown" })
+    if (doc.location.lat) {
+        bot.sendLocation(msg.chat.id, doc.location.lat, doc.location.lng)
+    }
 }
 
 /**
