@@ -22,7 +22,7 @@ bot.on('message', (msg) => {
          * update the event's chatId and start getting answers.
         */
         if (msgElements[1]) {
-            var token = msgElements[1]
+            let token = msgElements[1]
             db.remove({ _chatId: msg.chat.id, active: true }, { multi: true }, () => {
                 db.update({ _id: token }, { $set: { _chatId: msg.chat.id } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
                     if (affectedDoc) {
@@ -71,8 +71,6 @@ bot.on('message', (msg) => {
         }
 
     } else if ((msg.text === 'I\'m going !' || msg.text === 'No' || msg.text === 'Maybe') && msg.chat.type === 'group') {
-        console.log('****MSG*****', msg)
-
         db.findOne({ _chatId: msg.chat.id, active: true, readyToPublished: true }, (err, doc) => {
             if (doc) {
 
@@ -160,15 +158,18 @@ bot.on('message', (msg) => {
 
 /**
  * 
- * @param {*} msgChatId 
- * A unique chat identifier
+ * @param {*} doc 
+ * Document from database
+ * @param {*} msg 
+ * Message object
  * 
  * Generates a message that contains information about meeting
  * which is ready to be published.
  * 
  */
 function generateEvent(doc, msg) {
-    var message = '', reply_markup
+    var message = '', 
+        reply_markup
 
     if (msg.chat.type === 'private') {
         message += 'Event created. Use this link to share it to a group:\n'
@@ -186,6 +187,15 @@ function generateEvent(doc, msg) {
     }
 }
 
+/**
+ * @param {*} doc 
+ * Document from database
+ * @param {*} msg 
+ * Message object
+ * 
+ * Generates a message that contains information about results of meeting
+ * Users and their vote details
+ */
 function generateVoteResults(doc, msg) {
 
     var message = `COMING: ${doc.votes.positive.length}\n MAYBE: ${doc.votes.neutral.length} \n NOT COMING: ${doc.votes.negative.length}\n\n`
