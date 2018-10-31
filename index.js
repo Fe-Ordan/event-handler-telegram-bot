@@ -11,6 +11,8 @@ const bot = new TelegramBot(TELEGRAM_BOT_API_TOKEN, { polling: true })
 
 /**
  *  Listener for the message event.
+ * 
+ * @todo Different behaviour when user answers directly to bot's message.
  */
 bot.on('message', (msg) => {
 
@@ -195,6 +197,8 @@ function generateEvent(doc, msg) {
  * 
  * Generates a message that contains information about results of meeting
  * Users and their vote details
+ * 
+ * @todo it's sending different messages for all fields, fix it.
  */
 function generateVoteResults(doc, msg) {
 
