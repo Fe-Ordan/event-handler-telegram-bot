@@ -1,6 +1,7 @@
 const TelegramBot = require('node-telegram-bot-api')
 const Datastore = require('nedb')
 const request = require('request')
+const _ = require('lodash')
 
 const db = new Datastore({ filename: 'store.db', autoload: true })
 
@@ -35,9 +36,11 @@ bot.on('message', (msg) => {
                 _chatId: msg.chat.id,
                 active: true,
                 readyToPublished: false,
-                positive: [],
-                neutral: [],
-                negative: []
+                votes: {
+                    positive: [],
+                    neutral: [],
+                    negative: []
+                }
             }
             db.remove({ _chatId: msg.chat.id, active: true }, { multi: true }, () => {
                 db.insert(event, (err, newDoc) => {
@@ -53,7 +56,7 @@ bot.on('message', (msg) => {
                 bot.sendMessage(msg.chat.id, `Can't find any active events. Send /start to create a new one.`)
             }
         })
-    } else if(msg.text.match(/\/results/)) {
+    } else if (msg.text.match(/\/results/)) {
 
         if (msg.chat.type === 'group') {
             db.findOne({ _chatId: msg.chat.id, active: true, readyToPublished: true }, (err, doc) => {
@@ -67,32 +70,64 @@ bot.on('message', (msg) => {
             bot.sendMessage(msg.chat.id, 'Event has to be started in group to see the results...')
         }
 
-    } else if((msg.text === 'I\'m going !' || msg.text === 'No' || msg.text === 'Maybe') && msg.chat.type === 'group') {
+    } else if ((msg.text === 'I\'m going !' || msg.text === 'No' || msg.text === 'Maybe') && msg.chat.type === 'group') {
         console.log('****MSG*****', msg)
-        
-        if (msg.text === 'I\'m going !') {
-            db.update({ _chatId: msg.chat.id }, { $addToSet: { positive: msg.from.id } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
-                if (affectedDoc) {
-                    generateVoteResults(affectedDoc, msg)
-                }
-            })
-        } else if (msg.text === 'No') {
-            db.update({ _chatId: msg.chat.id }, { $addToSet: { negative: msg.from.id } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
-                if (affectedDoc) {
-                    generateVoteResults(affectedDoc, msg)
-                }
-            })
-        } else {
-            db.update({ _chatId: msg.chat.id }, { $addToSet: { neutral: msg.from.id } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
-                if (affectedDoc) {
-                    generateVoteResults(affectedDoc, msg)
-                }
-            })
-        }
 
-        db.update({ _chatId: msg.chat.id }, { $inc: { update: 1 } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
-            if (affectedDoc) {
-                generateEvent(affectedDoc, msg)
+        db.findOne({ _chatId: msg.chat.id, active: true, readyToPublished: true }, (err, doc) => {
+            if (doc) {
+
+                let votes = doc.votes,
+                    id = msg.from.id,
+                    change,
+                    field
+
+                switch (msg.text) {
+                    case 'I\'m going !':
+                        field = 'positive'
+                        break
+                    case 'Maybe':
+                        field = 'neutral'
+                        break
+                    case 'No':
+                        field = 'negative'
+                        break
+                }
+
+                if (field === 'positive') {
+                    if (votes.neutral.includes(id)) {
+                        _.pull(votes.neutral, id)
+                        change = true
+                    } else if (votes.negative.includes(id)) {
+                        _.pull(votes.negative, id)
+                        change = true
+                    }
+                } else if (field === 'neutral') {
+                    if (votes.positive.includes(id)) {
+                        _.pull(votes.positive, id)
+                        change = true
+                    } else if (votes.negative.includes(id)) {
+                        _.pull(votes.negative, id)
+                        change = true
+                    }
+                } else {
+                    if (votes.neutral.includes(id)) {
+                        _.pull(votes.neutral, id)
+                        change = true
+                    } else if (votes.positive.includes(id)) {
+                        _.pull(votes.positive, id)
+                        change = true
+                    }
+                }
+
+                if (change || !votes[field].includes(id)) {
+                    votes[field].push(id)
+                }
+
+                db.update({ _chatId: msg.chat.id, active: true}, {$set: {votes}}, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
+                    if (affectedDoc) {
+                        generateVoteResults(affectedDoc, msg)
+                    }
+                })
             }
         })
     }
@@ -144,7 +179,7 @@ function generateEvent(doc, msg) {
         }
     }
 
-    message += `*${doc.title}* \n\n \uD83D\uDCC5  ${doc.date} \n\n Adress: ${doc.location.address} \n\n Going: ${doc.positive} \n Maybe: ${doc.neutral} \n No: ${doc.negative}`
+    message += `*${doc.title}* \n\n \uD83D\uDCC5  ${doc.date} \n\n Adress: ${doc.location.address} \n`
     bot.sendMessage(msg.chat.id, message, { parse_mode: "Markdown", reply_markup })
     if (doc.location.lat) {
         bot.sendLocation(msg.chat.id, doc.location.lat, doc.location.lng)
@@ -153,15 +188,37 @@ function generateEvent(doc, msg) {
 
 function generateVoteResults(doc, msg) {
 
-    var message = `COMING: ${doc.positive.length}\n MAYBE: ${doc.neutral.length} \n NOT COMING: ${doc.negative.length}\n\n`
+    var message = `COMING: ${doc.votes.positive.length}\n MAYBE: ${doc.votes.neutral.length} \n NOT COMING: ${doc.votes.negative.length}\n\n`
 
-    if (doc.positive.length > 0) {
+    if (doc.votes.positive.length > 0) {
         message += 'WHO IS COMING ? \n'
-        doc.positive.forEach((el, index) => {
+        doc.votes.positive.forEach((el, index) => {
             bot.getChatMember(msg.chat.id, el)
                 .then((chatMember) => {
                     message += `@${chatMember.user.username}, `
-                    bot.sendMessage(msg.chat.id, message)
+                    bot.sendMessage(msg.chat.id, message + '\n')
+                })
+            })
+        }
+        
+        if (doc.votes.negative.length > 0) {
+            message += 'WHO IS NOT COMING ? \n'
+            doc.votes.negative.forEach((el, index) => {
+                bot.getChatMember(msg.chat.id, el)
+                .then((chatMember) => {
+                    message += `@${chatMember.user.username}, `
+                    bot.sendMessage(msg.chat.id, message + '\n')
+                })
+            })
+        }
+        
+        if (doc.votes.neutral.length > 0) {
+            message += 'WHO IS NOT DECIDED ? \n'
+            doc.votes.neutral.forEach((el, index) => {
+                bot.getChatMember(msg.chat.id, el)
+                .then((chatMember) => {
+                    message += `@${chatMember.user.username}, `
+                    bot.sendMessage(msg.chat.id, message + '\n')
                 })
         })
     }
@@ -172,8 +229,7 @@ function generateVoteResults(doc, msg) {
  * @param {*} address 
  * An adress string.
  * @param {*} callback 
- * Callback function either called with the location object or error.
- * 
+ * Callback function either called with the location object or error. * 
  * Makes a geocode request to Google API to get the latitude and longtitude
  * values of the location with the given adress.
  * 
