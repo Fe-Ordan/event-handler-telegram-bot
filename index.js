@@ -35,9 +35,9 @@ bot.on('message', (msg) => {
                 _chatId: msg.chat.id,
                 active: true,
                 readyToPublished: false,
-                positive: 0,
-                neutral: 0,
-                negative: 0
+                positive: [],
+                neutral: [],
+                negative: []
             }
             db.remove({ _chatId: msg.chat.id, active: true }, { multi: true }, () => {
                 db.insert(event, (err, newDoc) => {
@@ -53,18 +53,41 @@ bot.on('message', (msg) => {
                 bot.sendMessage(msg.chat.id, `Can't find any active events. Send /start to create a new one.`)
             }
         })
-    } else if(msg.text.match(/\I'm going/) || msg.text.match(/\No/) || msg.text.match(/\Maybe/)) {
+    } else if(msg.text.match(/\/results/)) {
 
-        switch(msg.text) {
-            case 'I\'m going':
-                update = positive
-                break
-            case 'No':
-                update = neutral
-                break
-            case 'Maybe':
-                update = negative
-                break
+        if (msg.chat.type === 'group') {
+            db.findOne({ _chatId: msg.chat.id, active: true, readyToPublished: true }, (err, doc) => {
+                if (doc) {
+                    generateVoteResults(doc, msg)
+                } else {
+                    bot.sendMessage(msg.chat.id, `Can't find any active events. Send /start to create a new one.`)
+                }
+            })
+        } else {
+            bot.sendMessage(msg.chat.id, 'Event has to be started in group to see the results...')
+        }
+
+    } else if((msg.text === 'I\'m going !' || msg.text === 'No' || msg.text === 'Maybe') && msg.chat.type === 'group') {
+        console.log('****MSG*****', msg)
+        
+        if (msg.text === 'I\'m going !') {
+            db.update({ _chatId: msg.chat.id }, { $addToSet: { positive: msg.from.id } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
+                if (affectedDoc) {
+                    generateVoteResults(affectedDoc, msg)
+                }
+            })
+        } else if (msg.text === 'No') {
+            db.update({ _chatId: msg.chat.id }, { $addToSet: { negative: msg.from.id } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
+                if (affectedDoc) {
+                    generateVoteResults(affectedDoc, msg)
+                }
+            })
+        } else {
+            db.update({ _chatId: msg.chat.id }, { $addToSet: { neutral: msg.from.id } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
+                if (affectedDoc) {
+                    generateVoteResults(affectedDoc, msg)
+                }
+            })
         }
 
         db.update({ _chatId: msg.chat.id }, { $inc: { update: 1 } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
@@ -72,18 +95,6 @@ bot.on('message', (msg) => {
                 generateEvent(affectedDoc, msg)
             }
         })
-    // } else if(msg.text === 'Maybe') {
-    //     db.update({ _chatId: msg.chat.id }, { $inc: { neutral: 1 } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
-    //         if (affectedDoc) {
-    //             generateEvent(affectedDoc, msg)
-    //         }
-    //     })
-    // } else if(msg.text === 'No') {
-    //     db.update({ _chatId: msg.chat.id }, { $inc: { negative: 1 } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
-    //         if (affectedDoc) {
-    //             generateEvent(affectedDoc, msg)
-    //         }
-    //     })
     }
     else {
         db.findOne({ _chatId: msg.chat.id, active: true }, (err, doc) => {
@@ -138,6 +149,23 @@ function generateEvent(doc, msg) {
     if (doc.location.lat) {
         bot.sendLocation(msg.chat.id, doc.location.lat, doc.location.lng)
     }
+}
+
+function generateVoteResults(doc, msg) {
+
+    var message = `COMING: ${doc.positive.length}\n MAYBE: ${doc.neutral.length} \n NOT COMING: ${doc.negative.length}\n\n`
+
+    if (doc.positive.length > 0) {
+        message += 'WHO IS COMING ? \n'
+        doc.positive.forEach((el, index) => {
+            bot.getChatMember(msg.chat.id, el)
+                .then((chatMember) => {
+                    message += `@${chatMember.user.username}, `
+                    bot.sendMessage(msg.chat.id, message)
+                })
+        })
+    }
+
 }
 
 /**
