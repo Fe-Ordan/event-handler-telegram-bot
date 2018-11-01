@@ -5,7 +5,7 @@ const _ = require('lodash')
 
 const db = new Datastore({ filename: 'store.db', autoload: true })
 
-const { TELEGRAM_BOT_API_TOKEN, GOOGLE_API_TOKEN, JWT_SECRET } = require('./config.json')
+const { TELEGRAM_BOT_API_TOKEN, GOOGLE_API_TOKEN } = require('./config.json')
 
 const bot = new TelegramBot(TELEGRAM_BOT_API_TOKEN, { polling: true })
 
