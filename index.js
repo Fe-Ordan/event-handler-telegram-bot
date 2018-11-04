@@ -11,12 +11,11 @@ const bot = new TelegramBot(TELEGRAM_BOT_API_TOKEN, { polling: true })
 
 /**
  *  Listener for the message event.
- * 
- * @todo Different behaviour when user answers directly to bot's message.
  */
 bot.on('message', (msg) => {
 
     if (msg.text.match(/\/start/)) {
+        console.log('STart:', msg)
         var msgElements = msg.text.split(' ')
         var event = {}
 
@@ -72,68 +71,67 @@ bot.on('message', (msg) => {
             bot.sendMessage(msg.chat.id, 'Event has to be started in group to see the results...')
         }
 
-    } else if ((msg.text === 'I\'m going !' || msg.text === 'No' || msg.text === 'Maybe') && msg.chat.type === 'group') {
-        db.findOne({ _chatId: msg.chat.id, active: true, readyToPublished: true }, (err, doc) => {
-            if (doc) {
+    } else if (msg.chat.type === 'group' && msg.reply_to_message) {
+        if (msg.reply_to_message.from.username === 'eventhandler_bot') {
+            if (msg.text === 'I\'m going !' || msg.text === 'Maybe' || msg.text === 'No') {
+                db.findOne({ _chatId: msg.chat.id, active: true, readyToPublished: true }, (err, doc) => {
+                    if (doc) {
 
-                let votes = doc.votes,
-                    id = msg.from.id,
-                    change,
-                    field
+                        let votes = doc.votes,
+                            id = msg.from.id,
+                            field
 
-                switch (msg.text) {
-                    case 'I\'m going !':
-                        field = 'positive'
-                        break
-                    case 'Maybe':
-                        field = 'neutral'
-                        break
-                    case 'No':
-                        field = 'negative'
-                        break
-                }
+                        switch (msg.text) {
+                            case 'I\'m going !':
+                                field = 'positive'
+                                break
+                            case 'Maybe':
+                                field = 'neutral'
+                                break
+                            case 'No':
+                                field = 'negative'
+                                break
+                        }
 
-                if (field === 'positive') {
-                    if (votes.neutral.includes(id)) {
-                        _.pull(votes.neutral, id)
-                        change = true
-                    } else if (votes.negative.includes(id)) {
-                        _.pull(votes.negative, id)
-                        change = true
-                    }
-                } else if (field === 'neutral') {
-                    if (votes.positive.includes(id)) {
-                        _.pull(votes.positive, id)
-                        change = true
-                    } else if (votes.negative.includes(id)) {
-                        _.pull(votes.negative, id)
-                        change = true
-                    }
-                } else {
-                    if (votes.neutral.includes(id)) {
-                        _.pull(votes.neutral, id)
-                        change = true
-                    } else if (votes.positive.includes(id)) {
-                        _.pull(votes.positive, id)
-                        change = true
-                    }
-                }
+                        // Change will be made in db.
+                        if (!votes[field].includes(id)) {
+                            votes[field].push(id)
 
-                if (change || !votes[field].includes(id)) {
-                    votes[field].push(id)
-                }
+                            if (field === 'positive') {
+                                if (votes.neutral.includes(id)) {
+                                    _.pull(votes.neutral, id)
+                                } else if (votes.negative.includes(id)) {
+                                    _.pull(votes.negative, id)
+                                }
+                            } else if (field === 'neutral') {
+                                if (votes.positive.includes(id)) {
+                                    _.pull(votes.positive, id)
+                                } else if (votes.negative.includes(id)) {
+                                    _.pull(votes.negative, id)
+                                }
+                            } else {
+                                if (votes.neutral.includes(id)) {
+                                    _.pull(votes.neutral, id)
+                                } else if (votes.positive.includes(id)) {
+                                    _.pull(votes.positive, id)
+                                }
+                            }
 
-                db.update({ _chatId: msg.chat.id, active: true}, {$set: {votes}}, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
-                    if (affectedDoc) {
-                        generateVoteResults(affectedDoc, msg)
+                            db.update({ _chatId: msg.chat.id, active: true }, { $set: { votes } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
+                                if (affectedDoc) {
+                                    generateVoteResults(affectedDoc, msg)
+                                }
+                            })
+                        }
+
                     }
                 })
             }
-        })
-    }
-    else {
-        db.findOne({ _chatId: msg.chat.id, active: true }, (err, doc) => {
-            if (doc && doc.active) {
+        }
+    } else {
+        console.log('AAAA ', msg)
+        db.findOne({ _chatId: msg.chat.id, active: true, readyToPublished: false }, (err, doc) => {
+            if (doc) {
                 if (!doc.title) {
                     bot.sendMessage(msg.chat.id, `Great,now send me the *date* or *time* for ${msg.text} meeting.`, { parse_mode: "Markdown" })
                     db.update({ _chatId: msg.chat.id, active: true }, { $set: { title: msg.text } }, { returnUpdatedDocs: true })
@@ -170,7 +168,7 @@ bot.on('message', (msg) => {
  * 
  */
 function generateEvent(doc, msg) {
-    var message = '', 
+    var message = '',
         reply_markup
 
     if (msg.chat.type === 'private') {
@@ -212,24 +210,24 @@ function generateVoteResults(doc, msg) {
                     message += `@${chatMember.user.username}, `
                     bot.sendMessage(msg.chat.id, message + '\n')
                 })
-            })
-        }
-        
-        if (doc.votes.negative.length > 0) {
-            message += 'WHO IS NOT COMING ? \n'
-            doc.votes.negative.forEach((el, index) => {
-                bot.getChatMember(msg.chat.id, el)
+        })
+    }
+
+    if (doc.votes.negative.length > 0) {
+        message += 'WHO IS NOT COMING ? \n'
+        doc.votes.negative.forEach((el, index) => {
+            bot.getChatMember(msg.chat.id, el)
                 .then((chatMember) => {
                     message += `@${chatMember.user.username}, `
                     bot.sendMessage(msg.chat.id, message + '\n')
                 })
-            })
-        }
-        
-        if (doc.votes.neutral.length > 0) {
-            message += 'WHO IS NOT DECIDED ? \n'
-            doc.votes.neutral.forEach((el, index) => {
-                bot.getChatMember(msg.chat.id, el)
+        })
+    }
+
+    if (doc.votes.neutral.length > 0) {
+        message += 'WHO IS NOT DECIDED ? \n'
+        doc.votes.neutral.forEach((el, index) => {
+            bot.getChatMember(msg.chat.id, el)
                 .then((chatMember) => {
                     message += `@${chatMember.user.username}, `
                     bot.sendMessage(msg.chat.id, message + '\n')

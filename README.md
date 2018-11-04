@@ -7,3 +7,7 @@
 #
 
 Event Handler is a telegram [bot](https://core.telegram.org/bots/) by which you can create **event** and and put those **events** to vote to check who is up for it.
+
+## Usage
+
+Events consists of Title, Date and Location informations. To create a new one, simply send /start command. And then send the informations asked in order.
