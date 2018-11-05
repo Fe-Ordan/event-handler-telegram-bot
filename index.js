@@ -61,7 +61,7 @@ bot.on('message', (msg) => {
         if (msg.chat.type === 'group') {
             db.findOne({ _chatId: msg.chat.id, active: true, readyToPublished: true }, (err, doc) => {
                 if (doc) {
-                    generateVoteResults(doc, msg)
+                    generateVoteResults(doc, msg, false)
                 } else {
                     bot.sendMessage(msg.chat.id, `Can't find any active events. Send /start to create a new one.`)
                 }
@@ -77,7 +77,6 @@ bot.on('message', (msg) => {
                     if (doc) {
 
                         let votes = doc.votes,
-                            id = msg.from.id,
                             username = msg.from.username,
                             field
 
@@ -119,7 +118,7 @@ bot.on('message', (msg) => {
 
                             db.update({ _chatId: msg.chat.id, active: true }, { $set: { votes } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
                                 if (affectedDoc) {
-                                    generateVoteResults(affectedDoc, msg)
+                                    generateVoteResults(affectedDoc, msg, true)
                                 }
                             })
                         }
@@ -180,7 +179,10 @@ function generateEvent(doc, msg) {
     }
 
     message += `*${doc.title}* \n\n \uD83D\uDCC5  ${doc.date} \n\n Adress: ${doc.location.address} \n`
-    bot.sendMessage(msg.chat.id, message, { parse_mode: "Markdown", reply_markup })
+    bot.sendMessage(msg.chat.id, message, {
+        parse_mode: "Markdown",
+        reply_markup
+    })
     if (doc.location.lat) {
         bot.sendLocation(msg.chat.id, doc.location.lat, doc.location.lng)
     }
@@ -196,9 +198,10 @@ function generateEvent(doc, msg) {
  * Users and their vote details
  * 
  */
-function generateVoteResults(doc, msg) {
+function generateVoteResults(doc, msg, removeKeyboard) {
 
-    var message = `COMING: ${doc.votes.positive.length}\n MAYBE: ${doc.votes.neutral.length} \n NOT COMING: ${doc.votes.negative.length}\n\n`
+    var message = `COMING: ${doc.votes.positive.length}\n MAYBE: ${doc.votes.neutral.length} \n NOT COMING: ${doc.votes.negative.length}\n\n`,
+        reply_markup
 
     if (doc.votes.positive.length > 0) {
         message += 'WHO IS COMING ? \n'
@@ -224,7 +227,16 @@ function generateVoteResults(doc, msg) {
         message += '\n\n'
     }
 
-    bot.sendMessage(msg.chat.id, message)
+    if (removeKeyboard) {
+        reply_markup = { 
+            remove_keyboard: true 
+        }
+    }
+
+    bot.sendMessage(msg.chat.id, message, {
+        parse_mode: 'Markdown',
+        reply_markup
+    })
 }
 
 /**
