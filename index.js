@@ -15,7 +15,6 @@ const bot = new TelegramBot(TELEGRAM_BOT_API_TOKEN, { polling: true })
 bot.on('message', (msg) => {
 
     if (msg.text.match(/\/start/)) {
-        console.log('STart:', msg)
         var msgElements = msg.text.split(' ')
         var event = {}
 
@@ -79,6 +78,7 @@ bot.on('message', (msg) => {
 
                         let votes = doc.votes,
                             id = msg.from.id,
+                            username = msg.from.username,
                             field
 
                         switch (msg.text) {
@@ -94,26 +94,26 @@ bot.on('message', (msg) => {
                         }
 
                         // Change will be made in db.
-                        if (!votes[field].includes(id)) {
-                            votes[field].push(id)
+                        if (!votes[field].includes(username)) {
+                            votes[field].push(username)
 
                             if (field === 'positive') {
-                                if (votes.neutral.includes(id)) {
-                                    _.pull(votes.neutral, id)
-                                } else if (votes.negative.includes(id)) {
-                                    _.pull(votes.negative, id)
+                                if (votes.neutral.includes(username)) {
+                                    _.pull(votes.neutral, username)
+                                } else if (votes.negative.includes(username)) {
+                                    _.pull(votes.negative, username)
                                 }
                             } else if (field === 'neutral') {
-                                if (votes.positive.includes(id)) {
-                                    _.pull(votes.positive, id)
-                                } else if (votes.negative.includes(id)) {
-                                    _.pull(votes.negative, id)
+                                if (votes.positive.includes(username)) {
+                                    _.pull(votes.positive, username)
+                                } else if (votes.negative.includes(username)) {
+                                    _.pull(votes.negative, username)
                                 }
                             } else {
-                                if (votes.neutral.includes(id)) {
-                                    _.pull(votes.neutral, id)
-                                } else if (votes.positive.includes(id)) {
-                                    _.pull(votes.positive, id)
+                                if (votes.neutral.includes(username)) {
+                                    _.pull(votes.neutral, username)
+                                } else if (votes.positive.includes(username)) {
+                                    _.pull(votes.positive, username)
                                 }
                             }
 
@@ -129,7 +129,6 @@ bot.on('message', (msg) => {
             }
         }
     } else {
-        console.log('AAAA ', msg)
         db.findOne({ _chatId: msg.chat.id, active: true, readyToPublished: false }, (err, doc) => {
             if (doc) {
                 if (!doc.title) {
@@ -196,7 +195,6 @@ function generateEvent(doc, msg) {
  * Generates a message that contains information about results of meeting
  * Users and their vote details
  * 
- * @todo it's sending different messages for all fields, fix it.
  */
 function generateVoteResults(doc, msg) {
 
@@ -204,37 +202,29 @@ function generateVoteResults(doc, msg) {
 
     if (doc.votes.positive.length > 0) {
         message += 'WHO IS COMING ? \n'
-        doc.votes.positive.forEach((el, index) => {
-            bot.getChatMember(msg.chat.id, el)
-                .then((chatMember) => {
-                    message += `@${chatMember.user.username}, `
-                    bot.sendMessage(msg.chat.id, message + '\n')
-                })
+        doc.votes.positive.forEach((username, index) => {
+            message += `@${username} `
         })
-    }
-
-    if (doc.votes.negative.length > 0) {
-        message += 'WHO IS NOT COMING ? \n'
-        doc.votes.negative.forEach((el, index) => {
-            bot.getChatMember(msg.chat.id, el)
-                .then((chatMember) => {
-                    message += `@${chatMember.user.username}, `
-                    bot.sendMessage(msg.chat.id, message + '\n')
-                })
-        })
+        message += '\n\n'
     }
 
     if (doc.votes.neutral.length > 0) {
         message += 'WHO IS NOT DECIDED ? \n'
-        doc.votes.neutral.forEach((el, index) => {
-            bot.getChatMember(msg.chat.id, el)
-                .then((chatMember) => {
-                    message += `@${chatMember.user.username}, `
-                    bot.sendMessage(msg.chat.id, message + '\n')
-                })
+        doc.votes.neutral.forEach((username, index) => {
+            message += `@${username}, `
         })
+        message += '\n\n'
     }
 
+    if (doc.votes.negative.length > 0) {
+        message += 'WHO IS NOT COMING ? \n'
+        doc.votes.negative.forEach((username, index) => {
+            message += `@${username}, `
+        })
+        message += '\n\n'
+    }
+
+    bot.sendMessage(msg.chat.id, message)
 }
 
 /**
