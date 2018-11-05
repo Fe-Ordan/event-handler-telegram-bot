@@ -11,6 +11,8 @@ const bot = new TelegramBot(TELEGRAM_BOT_API_TOKEN, { polling: true })
 
 /**
  *  Listener for the message event.
+ * 
+ * @todo Handle command intersections with other bots in chat.
  */
 bot.on('message', (msg) => {
 
@@ -137,7 +139,6 @@ bot.on('message', (msg) => {
                     bot.sendMessage(msg.chat.id, `Send me the *location* for the meeting.`, { parse_mode: "Markdown" })
                     db.update({ _chatId: msg.chat.id, active: true }, { $set: { date: msg.text } }, { returnUpdatedDocs: true })
                 } else if (!doc.location) {
-                    bot.sendMessage(msg.chat.id, `Event ready !`)
                     geocodeRequest(msg.text, (err, location) => {
                         if (err) {
                             location = {
@@ -171,6 +172,7 @@ function generateEvent(doc, msg) {
 
     if (msg.chat.type === 'private') {
         message += 'Event created. Use this link to share it to a group:\n'
+        // @todo : eventhandler_bot
         message += `http://t.me/meetingsetterbot?startgroup=${doc._id}\n\n`
     } else {
         reply_markup = {
