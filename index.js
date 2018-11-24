@@ -15,8 +15,7 @@ const bot = new TelegramBot(TELEGRAM_BOT_API_TOKEN, { polling: true })
  * @todo Handle command intersections with other bots in chat.
  */
 bot.on('message', (msg) => {
-
-    if (msg.text.match(/\/start/)) {
+    if (msg.text.match(/\/start@eventhandler_bot/) || (msg.text.match(/\/start/) && msg.chat.type === 'private')) {
         var msgElements = msg.text.split(' ')
         var event = {}
 
@@ -50,7 +49,7 @@ bot.on('message', (msg) => {
                 })
             })
         }
-    } else if (msg.text.match(/\/events/)) {
+    } else if (msg.text.match(/\/events@eventhandler_bot/) || (msg.text.match(/\/events/) && msg.chat.type === 'private')) {
         db.findOne({ _chatId: msg.chat.id, active: true, readyToPublished: true }, (err, doc) => {
             if (doc) {
                 generateEvent(doc, msg)
@@ -58,8 +57,7 @@ bot.on('message', (msg) => {
                 bot.sendMessage(msg.chat.id, `Can't find any active events. Send /start to create a new one.`)
             }
         })
-    } else if (msg.text.match(/\/results/)) {
-
+    } else if (msg.text.match(/\/results@eventhandler_bot/) || (msg.text.match(/\/results/) && msg.chat.type === 'private')) {
         if (msg.chat.type === 'group') {
             db.findOne({ _chatId: msg.chat.id, active: true, readyToPublished: true }, (err, doc) => {
                 if (doc) {
@@ -71,87 +69,85 @@ bot.on('message', (msg) => {
         } else {
             bot.sendMessage(msg.chat.id, 'Event has to be started in group to see the results...')
         }
-
-    } else if (msg.chat.type === 'group' && msg.reply_to_message) {
-        if (msg.reply_to_message.from.username === 'eventhandler_bot') {
-            if (msg.text === 'I\'m going !' || msg.text === 'Maybe' || msg.text === 'No') {
-                db.findOne({ _chatId: msg.chat.id, active: true, readyToPublished: true }, (err, doc) => {
-                    if (doc) {
-
-                        let votes = doc.votes,
-                            username = msg.from.username,
-                            field
-
-                        switch (msg.text) {
-                            case 'I\'m going !':
-                                field = 'positive'
-                                break
-                            case 'Maybe':
-                                field = 'neutral'
-                                break
-                            case 'No':
-                                field = 'negative'
-                                break
-                        }
-
-                        // Change will be made in db.
-                        if (!votes[field].includes(username)) {
-                            votes[field].push(username)
-
-                            if (field === 'positive') {
-                                if (votes.neutral.includes(username)) {
-                                    _.pull(votes.neutral, username)
-                                } else if (votes.negative.includes(username)) {
-                                    _.pull(votes.negative, username)
-                                }
-                            } else if (field === 'neutral') {
-                                if (votes.positive.includes(username)) {
-                                    _.pull(votes.positive, username)
-                                } else if (votes.negative.includes(username)) {
-                                    _.pull(votes.negative, username)
-                                }
-                            } else {
-                                if (votes.neutral.includes(username)) {
-                                    _.pull(votes.neutral, username)
-                                } else if (votes.positive.includes(username)) {
-                                    _.pull(votes.positive, username)
-                                }
-                            }
-
-                            db.update({ _chatId: msg.chat.id, active: true }, { $set: { votes } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
-                                if (affectedDoc) {
-                                    generateVoteResults(affectedDoc, msg, true)
-                                }
-                            })
-                        }
-
-                    }
-                })
-            }
-        }
     } else {
-        db.findOne({ _chatId: msg.chat.id, active: true, readyToPublished: false }, (err, doc) => {
-            if (doc) {
-                if (!doc.title) {
-                    bot.sendMessage(msg.chat.id, `Great,now send me the *date* or *time* for ${msg.text} meeting.`, { parse_mode: "Markdown" })
-                    db.update({ _chatId: msg.chat.id, active: true }, { $set: { title: msg.text } }, { returnUpdatedDocs: true })
-                } else if (!doc.date) {
-                    bot.sendMessage(msg.chat.id, `Send me the *location* for the meeting.`, { parse_mode: "Markdown" })
-                    db.update({ _chatId: msg.chat.id, active: true }, { $set: { date: msg.text } }, { returnUpdatedDocs: true })
-                } else if (!doc.location) {
-                    geocodeRequest(msg.text, (err, location) => {
-                        if (err) {
-                            location = {
-                                address: msg.text
+        if (msg.chat.type === 'private' || (msg.chat.type === 'group' && msg.reply_to_message && msg.reply_to_message.from.username === 'eventhandler_bot')) {
+            db.findOne({ _chatId: msg.chat.id, active: true, readyToPublished: false }, (err, doc) => {
+                if (doc) {
+                    if (!doc.title) {
+                        bot.sendMessage(msg.chat.id, `Great,now send me the *date* or *time* for ${msg.text} meeting.`, { parse_mode: "Markdown" })
+                        db.update({ _chatId: msg.chat.id, active: true }, { $set: { title: msg.text } }, { returnUpdatedDocs: true })
+                    } else if (!doc.date) {
+                        bot.sendMessage(msg.chat.id, `Send me the *location* for the meeting.`, { parse_mode: "Markdown" })
+                        db.update({ _chatId: msg.chat.id, active: true }, { $set: { date: msg.text } }, { returnUpdatedDocs: true })
+                    } else if (!doc.location) {
+                        geocodeRequest(msg.text, (err, location) => {
+                            if (err) {
+                                location = {
+                                    address: msg.text
+                                }
                             }
-                        }
-                        db.update({ _chatId: msg.chat.id, active: true }, { $set: { location, readyToPublished: true } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
-                            if (!err) generateEvent(affectedDoc, msg)
+                            db.update({ _chatId: msg.chat.id, active: true }, { $set: { location, readyToPublished: true } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
+                                if (!err) generateEvent(affectedDoc, msg)
+                            })
                         })
-                    })
+                    }
+                } else if(msg.chat.type === 'group') {
+                    if (msg.text === 'I\'m going !' || msg.text === 'Maybe' || msg.text === 'No') {
+                        db.findOne({ _chatId: msg.chat.id, active: true, readyToPublished: true }, (err, doc) => {
+                            if (doc) {
+                                let votes = doc.votes,
+                                    username = msg.from.username,
+                                    field
+        
+                                switch (msg.text) {
+                                    case 'I\'m going !':
+                                        field = 'positive'
+                                        break
+                                    case 'Maybe':
+                                        field = 'neutral'
+                                        break
+                                    case 'No':
+                                        field = 'negative'
+                                        break
+                                }
+        
+                                // Change will be made in db.
+                                if (!votes[field].includes(username)) {
+                                    votes[field].push(username)
+        
+                                    if (field === 'positive') {
+                                        if (votes.neutral.includes(username)) {
+                                            _.pull(votes.neutral, username)
+                                        } else if (votes.negative.includes(username)) {
+                                            _.pull(votes.negative, username)
+                                        }
+                                    } else if (field === 'neutral') {
+                                        if (votes.positive.includes(username)) {
+                                            _.pull(votes.positive, username)
+                                        } else if (votes.negative.includes(username)) {
+                                            _.pull(votes.negative, username)
+                                        }
+                                    } else {
+                                        if (votes.neutral.includes(username)) {
+                                            _.pull(votes.neutral, username)
+                                        } else if (votes.positive.includes(username)) {
+                                            _.pull(votes.positive, username)
+                                        }
+                                    }
+        
+                                    db.update({ _chatId: msg.chat.id, active: true }, { $set: { votes } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
+                                        if (affectedDoc) {
+                                            generateVoteResults(affectedDoc, msg, true)
+                                        }
+                                    })
+                                }
+        
+                            }
+                        })
+                    }
                 }
-            }
-        })
+            })
+        }
     }
 })
 
@@ -173,7 +169,7 @@ function generateEvent(doc, msg) {
     if (msg.chat.type === 'private') {
         message += 'Event created. Use this link to share it to a group:\n'
         // @todo : eventhandler_bot
-        message += `http://t.me/meetingsetterbot?startgroup=${doc._id}\n\n`
+        message += `http://t.me/eventhandler\\_bot?startgroup=${doc._id}\n\n`
     } else {
         reply_markup = {
             "keyboard": [['I\'m going !'], ['Maybe'], ['No']]
