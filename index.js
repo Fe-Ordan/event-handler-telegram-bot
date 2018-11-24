@@ -207,7 +207,7 @@ function generateVoteResults(doc, msg, removeKeyboard) {
 
     if (doc.votes.positive.length > 0) {
         message += 'WHO IS COMING ? \n'
-        doc.votes.positive.forEach((username, index) => {
+        doc.votes.positive.forEach((username) => {
             message += `@${username} `
         })
         message += '\n\n'
@@ -215,16 +215,16 @@ function generateVoteResults(doc, msg, removeKeyboard) {
 
     if (doc.votes.neutral.length > 0) {
         message += 'WHO IS NOT DECIDED ? \n'
-        doc.votes.neutral.forEach((username, index) => {
-            message += `@${username}, `
+        doc.votes.neutral.forEach((username) => {
+            message += `@${username} `
         })
         message += '\n\n'
     }
 
     if (doc.votes.negative.length > 0) {
         message += 'WHO IS NOT COMING ? \n'
-        doc.votes.negative.forEach((username, index) => {
-            message += `@${username}, `
+        doc.votes.negative.forEach((username) => {
+            message += `@${username} `
         })
         message += '\n\n'
     }
@@ -245,6 +245,9 @@ function generateVoteResults(doc, msg, removeKeyboard) {
  * @param {*} address 
  * An adress string.
  * @param {*} callback 
+ * 
+ * @todo Change callback to promise.
+ * 
  * Callback function either called with the location object or error. * 
  * Makes a geocode request to Google API to get the latitude and longtitude
  * values of the location with the given adress.

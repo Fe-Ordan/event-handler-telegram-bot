@@ -10,4 +10,4 @@ Event Handler is a telegram [bot](https://core.telegram.org/bots/), by which you
 
 ## Usage
 
-Events consists of Title, Date and Location informations. To create a new one, simply send **/start** command. And then send the informations asked in order.
+Events consists of Title, Date and Location informations. To create a new one, simply send **/start** command. Then send the informations asked in order.
