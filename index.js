@@ -32,7 +32,7 @@ bot.on('message', (msg) => {
                 })
             })
         } else {
-            bot.sendMessage(msg.chat.id, `Let's start, send me the meeting title !`)
+            bot.sendMessage(msg.chat.id, `Let's start, send me the meeting title !`, { reply_markup: { force_reply: true } })
             event = {
                 _chatId: msg.chat.id,
                 active: true,
@@ -74,10 +74,10 @@ bot.on('message', (msg) => {
             db.findOne({ _chatId: msg.chat.id, active: true, readyToPublished: false }, (err, doc) => {
                 if (doc) {
                     if (!doc.title) {
-                        bot.sendMessage(msg.chat.id, `Great,now send me the *date* or *time* for ${msg.text} meeting.`, { parse_mode: "Markdown" })
+                        bot.sendMessage(msg.chat.id, `Great,now send me the *date* or *time* for ${msg.text} meeting.`, { parse_mode: "Markdown", reply_markup: { force_reply: true } })
                         db.update({ _chatId: msg.chat.id, active: true }, { $set: { title: msg.text } }, { returnUpdatedDocs: true })
                     } else if (!doc.date) {
-                        bot.sendMessage(msg.chat.id, `Send me the *location* for the meeting.`, { parse_mode: "Markdown" })
+                        bot.sendMessage(msg.chat.id, `Send me the *location* for the meeting.`, { parse_mode: "Markdown", reply_markup: { force_reply: true } })
                         db.update({ _chatId: msg.chat.id, active: true }, { $set: { date: msg.text } }, { returnUpdatedDocs: true })
                     } else if (!doc.location) {
                         geocodeRequest(msg.text, (err, location) => {
@@ -91,14 +91,14 @@ bot.on('message', (msg) => {
                             })
                         })
                     }
-                } else if(msg.chat.type === 'group') {
+                } else if (msg.chat.type === 'group') {
                     if (msg.text === 'I\'m going !' || msg.text === 'Maybe' || msg.text === 'No') {
                         db.findOne({ _chatId: msg.chat.id, active: true, readyToPublished: true }, (err, doc) => {
                             if (doc) {
                                 let votes = doc.votes,
                                     username = msg.from.username,
                                     field
-        
+
                                 switch (msg.text) {
                                     case 'I\'m going !':
                                         field = 'positive'
@@ -110,11 +110,11 @@ bot.on('message', (msg) => {
                                         field = 'negative'
                                         break
                                 }
-        
+
                                 // Change will be made in db.
                                 if (!votes[field].includes(username)) {
                                     votes[field].push(username)
-        
+
                                     if (field === 'positive') {
                                         if (votes.neutral.includes(username)) {
                                             _.pull(votes.neutral, username)
@@ -134,14 +134,14 @@ bot.on('message', (msg) => {
                                             _.pull(votes.positive, username)
                                         }
                                     }
-        
+
                                     db.update({ _chatId: msg.chat.id, active: true }, { $set: { votes } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
                                         if (affectedDoc) {
                                             generateVoteResults(affectedDoc, msg, true)
                                         }
                                     })
                                 }
-        
+
                             }
                         })
                     }
@@ -226,8 +226,8 @@ function generateVoteResults(doc, msg, removeKeyboard) {
     }
 
     if (removeKeyboard) {
-        reply_markup = { 
-            remove_keyboard: true 
+        reply_markup = {
+            remove_keyboard: true
         }
     }
 
