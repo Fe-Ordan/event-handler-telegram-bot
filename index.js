@@ -199,11 +199,11 @@ function generateEvent(doc, msg) {
  */
 function generateVoteResults(doc, msg, removeKeyboard) {
 
-    var message = `COMING: ${doc.votes.positive.length}\n MAYBE: ${doc.votes.neutral.length} \n NOT COMING: ${doc.votes.negative.length}\n\n`,
+    var message = `*COMING:* ${doc.votes.positive.length}\n*MAYBE:* ${doc.votes.neutral.length} \n*NOT COMING:* ${doc.votes.negative.length}\n\n`,
         reply_markup
 
     if (doc.votes.positive.length > 0) {
-        message += 'WHO IS COMING ? \n'
+        message += 'WHO IS COMING ? \u2714\n'
         doc.votes.positive.forEach((username) => {
             message += `@${username} `
         })
@@ -211,7 +211,7 @@ function generateVoteResults(doc, msg, removeKeyboard) {
     }
 
     if (doc.votes.neutral.length > 0) {
-        message += 'WHO IS NOT DECIDED ? \n'
+        message += 'WHO IS NOT SURE ? \u2753 \n'
         doc.votes.neutral.forEach((username) => {
             message += `@${username} `
         })
@@ -219,7 +219,7 @@ function generateVoteResults(doc, msg, removeKeyboard) {
     }
 
     if (doc.votes.negative.length > 0) {
-        message += 'WHO IS NOT COMING ? \n'
+        message += 'WHO IS NOT COMING ? \u2716 \n'
         doc.votes.negative.forEach((username) => {
             message += `@${username} `
         })
@@ -240,21 +240,24 @@ function generateVoteResults(doc, msg, removeKeyboard) {
 
 function generateVoteInfo(msg) {
 
-    var message, comp
+    var message, start, end;
 
     switch (msg.text) {
         case 'I\'m going !':
-            comp = 'is going !'
+            start = '\u2714'
+            end = 'is going !'
             break
         case 'Maybe':
-            comp = 'is not sure.'
+            start = '\u2753'
+            end = 'is not sure.'
             break
         case 'No':
-            comp = 'is not going.'
+            start = '\u2716'
+            end = 'is not going.'
             break
     }
 
-    message = `@${msg.from.username} ${comp} `
+    message = `${start} @${msg.from.username} ${end} \n\n /results - show results`
 
     bot.sendMessage(msg.chat.id, message)
 }
