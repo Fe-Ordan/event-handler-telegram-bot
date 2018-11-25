@@ -137,7 +137,8 @@ bot.on('message', (msg) => {
 
                                     db.update({ _chatId: msg.chat.id, active: true }, { $set: { votes } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
                                         if (affectedDoc) {
-                                            generateVoteResults(affectedDoc, msg, true)
+                                            // generateVoteResults(affectedDoc, msg, true)
+                                            generateVoteInfo(msg)
                                         }
                                     })
                                 }
@@ -176,7 +177,7 @@ function generateEvent(doc, msg) {
         }
     }
 
-    message += `*${doc.title}* \n\n \uD83D\uDCC5  ${doc.date} \n\n Adress: ${doc.location.address} \n`
+    message += `\n*${doc.title}* \n\n *Date/Time* \uD83D\uDCC5 \n ${doc.date} \n\n *Location* \u{1F5FA}\u{FE0F}\n${doc.location.address} \n`
     bot.sendMessage(msg.chat.id, message, {
         parse_mode: "Markdown",
         reply_markup
@@ -235,6 +236,27 @@ function generateVoteResults(doc, msg, removeKeyboard) {
         parse_mode: 'Markdown',
         reply_markup
     })
+}
+
+function generateVoteInfo(msg) {
+
+    var message, comp
+
+    switch (msg.text) {
+        case 'I\'m going !':
+            comp = 'is going !'
+            break
+        case 'Maybe':
+            comp = 'is not sure.'
+            break
+        case 'No':
+            comp = 'is not going.'
+            break
+    }
+
+    message = `@${msg.from.username} ${comp} `
+
+    bot.sendMessage(msg.chat.id, message)
 }
 
 /**
