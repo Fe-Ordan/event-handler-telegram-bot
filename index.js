@@ -170,9 +170,9 @@ function generateEvent(doc, msg) {
 
     if (msg.chat.type === 'private') {
         message += 'Event created. Use this link to share it to a group:\n'
-        // @todo : eventhandler_bot
-        message += `http://t.me/eventhandler\\_bot?startgroup=${doc._id}\n\n`
+        message += `http://t.me/eventhandler\\_bot?startgroup=${doc._id}\n`
     } else {
+        message += ' '
         reply_markup = {
             "keyboard": [['I\'m going !'], ['Maybe'], ['No']]
         }
