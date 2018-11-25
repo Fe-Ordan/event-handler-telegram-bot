@@ -61,7 +61,7 @@ bot.on('message', (msg) => {
         if (msg.chat.type === 'group') {
             db.findOne({ _chatId: msg.chat.id, active: true, readyToPublished: true }, (err, doc) => {
                 if (doc) {
-                    generateVoteResults(doc, msg, false)
+                    generateVoteResults(doc, msg)
                 } else {
                     bot.sendMessage(msg.chat.id, `Can't find any active events. Send /start to create a new one.`)
                 }
@@ -137,10 +137,11 @@ bot.on('message', (msg) => {
 
                                     db.update({ _chatId: msg.chat.id, active: true }, { $set: { votes } }, { returnUpdatedDocs: true }, (err, numAffected, affectedDoc) => {
                                         if (affectedDoc) {
-                                            // generateVoteResults(affectedDoc, msg, true)
                                             generateVoteInfo(msg)
                                         }
                                     })
+                                } else {
+                                    generateVoteInfo(msg)
                                 }
 
                             }
@@ -197,50 +198,55 @@ function generateEvent(doc, msg) {
  * Users and their vote details
  * 
  */
-function generateVoteResults(doc, msg, removeKeyboard) {
-
-    var message = `*COMING:* ${doc.votes.positive.length}\n*MAYBE:* ${doc.votes.neutral.length} \n*NOT COMING:* ${doc.votes.negative.length}\n\n`,
-        reply_markup
+function generateVoteResults(doc, msg) {
+    var message = `*COMING:* ${doc.votes.positive.length}\n*MAYBE:* ${doc.votes.neutral.length} \n*NOT COMING:* ${doc.votes.negative.length}\n\n`
 
     if (doc.votes.positive.length > 0) {
         message += 'WHO IS COMING ? \u2714\n'
-        doc.votes.positive.forEach((username) => {
-            message += `@${username} `
+        doc.votes.positive.forEach((username, index) => {
+            message += `@${username}`
+            if (doc.votes.positive.length - 1 !== index)
+                message += ', '
         })
         message += '\n\n'
     }
 
     if (doc.votes.neutral.length > 0) {
         message += 'WHO IS NOT SURE ? \u2753 \n'
-        doc.votes.neutral.forEach((username) => {
-            message += `@${username} `
+        doc.votes.neutral.forEach((username, index) => {
+            message += `@${username}`
+            if (doc.votes.neutral.length - 1 !== index)
+                message += ', '
         })
         message += '\n\n'
     }
 
     if (doc.votes.negative.length > 0) {
         message += 'WHO IS NOT COMING ? \u2716 \n'
-        doc.votes.negative.forEach((username) => {
-            message += `@${username} `
+        doc.votes.negative.forEach((username, index) => {
+            message += `@${username}`
+            if (doc.votes.negative.length - 1 !== index)
+                message += ', '
         })
         message += '\n\n'
     }
 
-    if (removeKeyboard) {
-        reply_markup = {
-            remove_keyboard: true
-        }
-    }
-
     bot.sendMessage(msg.chat.id, message, {
-        parse_mode: 'Markdown',
-        reply_markup
+        parse_mode: 'Markdown'
     })
 }
 
+/**
+ * @param {*} msg 
+ * Message object
+ * 
+ * Generates a message that contains information about the user who is just voted
+ * 
+ */
 function generateVoteInfo(msg) {
-
-    var message, start, end;
+    var message,
+        start,
+        end
 
     switch (msg.text) {
         case 'I\'m going !':
@@ -259,7 +265,12 @@ function generateVoteInfo(msg) {
 
     message = `${start} @${msg.from.username} ${end} \n\n /results - show results`
 
-    bot.sendMessage(msg.chat.id, message)
+    bot.sendMessage(msg.chat.id, message, {
+        parse_mode: "Markdown",
+        reply_markup: {
+            remove_keyboard: true
+        }
+    })
 }
 
 /**
