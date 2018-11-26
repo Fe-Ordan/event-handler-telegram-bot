@@ -5,14 +5,12 @@ const _ = require('lodash')
 
 const db = new Datastore({ filename: 'store.db', autoload: true })
 
-const { TELEGRAM_BOT_API_TOKEN, GOOGLE_API_TOKEN } = require('./config.json')
+const { TELEGRAM_BOT_API_TOKEN, GOOGLE_API_TOKEN } = require('./config/config-sample.json')
 
 const bot = new TelegramBot(TELEGRAM_BOT_API_TOKEN, { polling: true })
 
 /**
  *  Listener for the message event.
- * 
- * @todo Handle command intersections with other bots in chat.
  */
 bot.on('message', (msg) => {
     if (msg.text.match(/\/start@eventhandler_bot/) || (msg.text.match(/\/start/) && msg.chat.type === 'private')) {
